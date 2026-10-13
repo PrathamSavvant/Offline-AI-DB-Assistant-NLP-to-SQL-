@@ -1,0 +1,25 @@
+<link rel="stylesheet" href="{{ url_for('static', filename='styles/app-shell.css') }}">
+{% macro icon(name) -%}<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">{% if name == 'chat' %}<path d="M21 11a8 8 0 0 1-8 8H5l-3 3V11a9 9 0 0 1 19 0Z"/><path d="M7 9h10M7 13h6"/>{% elif name == 'map' %}<rect x="8" y="2" width="8" height="5" rx="1"/><rect x="2" y="17" width="8" height="5" rx="1"/><rect x="14" y="17" width="8" height="5" rx="1"/><path d="M12 7v5M6 17v-5h12v5"/>{% elif name == 'book' %}<path d="M12 5c-4-3-9-2-9-2v16s5-1 9 2c4-3 9-2 9-2V3s-5-1-9 2v16"/>{% elif name == 'pending' %}<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h4M8 16h2m5-1 2 2 4-4"/>{% elif name == 'dashboard' %}<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>{% elif name == 'history' %}<path d="M3 11a9 9 0 1 1 2 7M3 4v7h7m2-4v6l4 2"/>{% elif name == 'debug' %}<path d="m8 5-6 7 6 7m8-14 6 7-6 7m-3-16-2 18"/>{% else %}<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 4 16 4 16 0V5M4 12c0 4 16 4 16 0"/>{% endif %}</svg>{%- endmacro %}
+<aside id="appSidebar" class="app-sidebar" aria-label="Application navigation">
+  <a class="app-brand" href="/" aria-label="Database home">{{ icon('database') }}<span>Database<span class="app-brand-sub">INTELLIGENCE WORKSPACE</span></span></a>
+  <button type="button" id="navToggle" class="app-nav-toggle" aria-expanded="true" aria-controls="appSidebar" aria-label="Collapse navigation">‹</button>
+  <div class="app-database"><span class="app-online-dot"></span><span id="dbBadge">Local workspace</span></div>
+  <nav class="app-nav">
+    {% for group, links in [('Workspace', [('/', 'AI Chat', 'chat'),('/schema-map','Schema Map','map')]), ('Knowledge', [('/defined-knowledge','Defined Knowledge','book'),('/pending-knowledge','Pending Review','pending')]), ('System', [('/crawler-dashboard','Dashboard','dashboard'),('/schema-changes','Schema Changes','history'),('/debug','Prompt Debugger','debug')])] %}
+    <div class="app-nav-label">{{ group }}</div>
+    {% for href, label, symbol in links %}
+    {% set active = request.path == href or (href != '/' and request.path.startswith(href + '/')) %}
+    <a href="{{ href }}" class="app-nav-link{% if active %} active{% endif %}"{% if active %} aria-current="page"{% endif %} title="{{ label }}">{{ icon(symbol) }}<span>{{ label }}</span></a>
+    {% endfor %}{% endfor %}
+    {% if offline_exit_available %}<button type="button" id="exitApplication" class="app-nav-link app-exit" data-exit-token="{{ offline_exit_token }}" data-exit-mode="{{ offline_exit_mode }}" title="Exit Application"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v9"/><path d="M6.3 5.7a9 9 0 1 0 11.4 0"/></svg><span>Exit Application</span></button>{% endif %}
+  </nav>
+  <div class="app-sidebar-bottom">
+    {% if request.path == '/' %}
+    <div class="model-selector-wrap"><div class="model-label">LOCAL MODEL</div><button type="button" class="model-selector-btn" onclick="toggleModelDropdown()"><span class="model-dot"></span><span class="model-name" id="modelName">Connecting…</span><span aria-hidden="true">⌄</span></button><div class="model-dropdown" id="modelDropdown"></div></div>
+    <div class="sidebar-status"><span class="pulse-dot" id="statusDot"></span><span id="statusText">Checking engine…</span></div>
+    {% endif %}
+    <a class="app-nav-link app-connect" href="/?connection=1" title="Connection settings">{{ icon('database') }}<span>Connection settings</span></a>
+    <div class="app-local-note" id="sidebarFooter">Local &amp; private</div>
+  </div>
+</aside>
+<script src="{{ url_for('static', filename='scripts/app-shell.js') }}" defer></script>

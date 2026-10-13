@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Knowledge Dashboard · AI Database Assistant</title>
+<meta name="description" content="Monitor database crawler status, total tables, relationships, and trigger manual schema synchronization.">
+<style>
+:root {
+  --bg: #0b0d14; --sidebar-bg: #10131e; --panel: #151926; --panel-alt: #1a1f30;
+  --border: #22293d; --border-mid: #2c354f; --text: #e9edfa; --text-dim: #a0a8c2; --muted: #646e8c;
+  --accent: #5eead4; --accent-glow: rgba(94,234,212,0.16); --accent-dim: #1b3e39;
+  --purple: #a78bfa; --amber: #fbbf24; --error: #f87171; --error-bg: #2b1818;
+  --radius: 12px; --radius-sm: 8px; --sidebar-w: 260px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; display: flex; min-height: 100vh; }
+
+.sidebar { width: var(--sidebar-w); min-width: var(--sidebar-w); background: var(--sidebar-bg); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; overflow-y: auto; }
+.sidebar-brand { padding: 20px 18px 14px; border-bottom: 1px solid var(--border); }
+.brand-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.brand-icon { width: 34px; height: 34px; background: linear-gradient(135deg,#5eead4 0%,#3b82f6 100%); border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; box-shadow: 0 0 16px rgba(94,234,212,.25); }
+.brand-name { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 15px; letter-spacing: -.02em; }
+.brand-sub { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--accent); background: var(--accent-dim); padding: 3px 10px; border-radius: 20px; display: inline-block; }
+
+.sidebar-nav { padding: 14px 10px; flex: 1; }
+.nav-section { font-size: 9.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); padding: 0 8px; margin: 14px 0 5px; }
+.nav-section:first-child { margin-top: 0; }
+.nav-link { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: var(--radius-sm); color: var(--text-dim); text-decoration: none; font-size: 13px; font-weight: 500; transition: all .14s; }
+.nav-link:hover { background: var(--panel); color: var(--text); }
+.nav-link.active { background: var(--panel-alt); color: var(--accent); font-weight: 600; }
+.nav-icon { font-size: 14px; width: 18px; text-align: center; }
+
+.sidebar-footer { padding: 12px 18px; border-top: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--muted); }
+
+.main { margin-left: var(--sidebar-w); flex: 1; padding: 36px 40px 60px; max-width: 1100px; }
+.page-header { margin-bottom: 24px; display: flex; align-items: flex-start; justify-content: space-between; }
+.page-title { font-family: 'Space Grotesk', sans-serif; font-size: 26px; font-weight: 700; letter-spacing: -.03em; margin-bottom: 6px; }
+.page-subtitle { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted); max-width: 680px; line-height: 1.6; }
+
+.btn-accent { background: var(--accent); color: #08201d; border: none; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 13px; padding: 10px 20px; border-radius: var(--radius-sm); cursor: pointer; transition: all .14s; }
+.btn-accent:hover { box-shadow: 0 0 16px var(--accent-glow); }
+
+.metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+.metric-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; display: flex; flex-direction: column; gap: 6px; }
+.metric-val { font-family: 'Space Grotesk', sans-serif; font-size: 32px; font-weight: 700; color: var(--accent); }
+.metric-lbl { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; color: var(--muted); letter-spacing: .05em; }
+
+.panel-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+{% include '_app_shell.html' %}
+
+<main class="main">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Knowledge & Crawler Dashboard</h1>
+      <p class="page-subtitle">Real-time status of database schema scans, table annotations, relationship graphs, and knowledge synchronization.</p>
+    </div>
+    <button class="btn-accent" onclick="triggerRebuild()">🔄 Rescan & Rebuild</button>
+  </div>
+
+  <div class="metrics-grid">
+    <div class="metric-card">
+      <div class="metric-val" id="metricTables">0</div>
+      <div class="metric-lbl">Total Tables</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-val" id="metricCols">0</div>
+      <div class="metric-lbl">Total Columns</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-val" id="metricRels">0</div>
+      <div class="metric-lbl">Relationships</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-val" id="metricPending">0</div>
+      <div class="metric-lbl">Unmapped Tokens</div>
+    </div>
+  </div>
+
+  <div class="panel-card" style="margin-bottom:20px;">
+    <div style="font-weight:700;color:var(--text);margin-bottom:14px;font-family:'Space Grotesk',sans-serif;font-size:16px;display:flex;justify-content:space-between;align-items:center;">
+      <span>Database Identity & Knowledge Status</span>
+      <span id="regStatusBadge" style="font-size:11px;padding:3px 10px;border-radius:12px;background:var(--accent-dim);color:var(--accent);">Loading...</span>
+    </div>
+    <div id="identityDetails" style="display:grid;grid-template-columns:repeat(3, 1fr);gap:12px;font-size:12.5px;">
+      <div><span style="color:var(--muted);">Database Name:</span> <strong id="regDbName" style="color:var(--text);">-</strong></div>
+      <div><span style="color:var(--muted);">Knowledge Version:</span> <strong id="regVer" style="color:var(--text);">-</strong></div>
+      <div><span style="color:var(--muted);">Last Scan:</span> <strong id="regLastScan" style="color:var(--text);">-</strong></div>
+      <div><span style="color:var(--muted);">Table Profiles:</span> <strong id="regProfiles" style="color:var(--text);">-</strong></div>
+      <div><span style="color:var(--muted);">Database ID:</span> <strong id="regId" style="color:var(--text);font-size:11px;">-</strong></div>
+      <div><span style="color:var(--muted);">Items Needing Review:</span> <strong id="regNeedsReview" style="color:var(--amber);">-</strong></div>
+    </div>
+  </div>
+
+  <div class="panel-card">
+    <div style="font-weight:700;color:var(--text);margin-bottom:12px;font-family:'Space Grotesk',sans-serif;font-size:16px;">Crawler Synchronization Log</div>
+    <div id="crawlStatus">Loading crawler status...</div>
+  </div>
+</main>
+
+<script>
+async function loadDashboard() {
+  const r = await fetch('/api/crawler/dashboard');
+  const d = await r.json();
+  document.getElementById('metricTables').textContent = d.total_tables || 0;
+  document.getElementById('metricCols').textContent = d.total_columns || 0;
+  document.getElementById('metricRels').textContent = d.total_relationships || 0;
+  document.getElementById('metricPending').textContent = d.unknown_abbreviations || 0;
+
+  const statusEl = document.getElementById('crawlStatus');
+  statusEl.innerHTML = `
+    <div><strong>Last Crawl Timestamp:</strong> ${d.last_crawl ? new Date(d.last_crawl).toLocaleString() : 'N/A'}</div>
+    <div><strong>Indexed Tables:</strong> ${d.total_tables}</div>
+    <div><strong>Discovered Relationships:</strong> ${d.total_relationships}</div>
+    <div><strong>New Tables Added:</strong> ${(d.new_tables||[]).join(', ')||'None'}</div>
+  `;
+
+  // Fetch Database Identity Registry
+  try {
+    const regRes = await fetch('/api/database/registry');
+    if (regRes.ok) {
+      const reg = await regRes.json();
+      document.getElementById('regDbName').textContent = reg.database_name || '-';
+      document.getElementById('regVer').textContent = `v${reg.knowledge_version || 1}`;
+      document.getElementById('regLastScan').textContent = reg.last_scan ? new Date(reg.last_scan).toLocaleString() : 'Never';
+      document.getElementById('regProfiles').textContent = `${reg.profile_count || 0} / ${reg.table_count || 0}`;
+      document.getElementById('regId').textContent = reg.database_id ? reg.database_id.substring(0, 13) + '...' : '-';
+
+      const reviewCount = reg.needs_review_total || 0;
+      document.getElementById('regNeedsReview').textContent = reviewCount > 0 ? `⚠ ${reviewCount} item(s)` : '✓ 0 (Up-to-date)';
+
+      const badge = document.getElementById('regStatusBadge');
+      if (reg.knowledge_status === 'up_to_date') {
+        badge.textContent = '✓ Knowledge Up-to-date';
+        badge.style.background = 'rgba(94, 234, 212, 0.15)';
+        badge.style.color = '#5eead4';
+      } else if (reg.knowledge_status === 'needs_rebuild') {
+        badge.textContent = '⚠ Schema Updated — Rebuild Pending';
+        badge.style.background = 'rgba(251, 191, 36, 0.15)';
+        badge.style.color = '#fbbf24';
+      } else {
+        badge.textContent = reg.knowledge_status || 'Unknown';
+      }
+    }
+  } catch (err) {
+    console.warn('Could not load database registry dashboard info:', err);
+  }
+}
+
+async function triggerRebuild() {
+  const statusEl = document.getElementById('crawlStatus');
+  statusEl.textContent = 'Triggering manual schema rescan and knowledge rebuild...';
+  try {
+    const r = await fetch('/api/schema-sync/trigger', {method: 'POST'});
+    const d = await r.json();
+    if (r.ok) {
+      statusEl.textContent = `✓ Schema synchronization completed. Fingerprint: ${d.knowledge_version}`;
+      loadDashboard();
+      window.dispatchEvent(new Event('schema-refreshed'));
+    } else {
+      statusEl.textContent = `✖ Sync failed: ${d.error || 'Unknown error'}`;
+    }
+  } catch(err) {
+    statusEl.textContent = `✖ Network error: ${err.message}`;
+  }
+}
+
+loadDashboard();
+</script>
+</body>
+</html>

@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Schema Explorer & Annotations · AI Database Assistant</title>
+<meta name="description" content="Explore database tables, columns, relationships, and priority annotations for the AI reasoning engine.">
+<style>
+:root {
+  --bg: #0b0d14; --sidebar-bg: #10131e; --panel: #151926; --panel-alt: #1a1f30;
+  --border: #22293d; --border-mid: #2c354f; --text: #e9edfa; --text-dim: #a0a8c2; --muted: #646e8c;
+  --accent: #5eead4; --accent-glow: rgba(94,234,212,0.16); --accent-dim: #1b3e39;
+  --purple: #a78bfa; --amber: #fbbf24; --error: #f87171; --error-bg: #2b1818;
+  --radius: 12px; --radius-sm: 8px; --sidebar-w: 260px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; display: flex; min-height: 100vh; }
+
+.sidebar { width: var(--sidebar-w); min-width: var(--sidebar-w); background: var(--sidebar-bg); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; overflow-y: auto; }
+.sidebar-brand { padding: 20px 18px 14px; border-bottom: 1px solid var(--border); }
+.brand-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.brand-icon { width: 34px; height: 34px; background: linear-gradient(135deg,#5eead4 0%,#3b82f6 100%); border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; box-shadow: 0 0 16px rgba(94,234,212,.25); }
+.brand-name { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 15px; letter-spacing: -.02em; }
+.brand-sub { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--accent); background: var(--accent-dim); padding: 3px 10px; border-radius: 20px; display: inline-block; }
+
+.sidebar-nav { padding: 14px 10px; flex: 1; }
+.nav-section { font-size: 9.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); padding: 0 8px; margin: 14px 0 5px; }
+.nav-section:first-child { margin-top: 0; }
+.nav-link { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: var(--radius-sm); color: var(--text-dim); text-decoration: none; font-size: 13px; font-weight: 500; transition: all .14s; }
+.nav-link:hover { background: var(--panel); color: var(--text); }
+.nav-link.active { background: var(--panel-alt); color: var(--accent); font-weight: 600; }
+.nav-icon { font-size: 14px; width: 18px; text-align: center; }
+
+.sidebar-footer { padding: 12px 18px; border-top: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--muted); }
+
+.main { margin-left: var(--sidebar-w); flex: 1; padding: 36px 40px 60px; max-width: 1100px; }
+.page-header { margin-bottom: 24px; }
+.page-title { font-family: 'Space Grotesk', sans-serif; font-size: 26px; font-weight: 700; letter-spacing: -.03em; margin-bottom: 6px; }
+.page-subtitle { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted); max-width: 680px; line-height: 1.6; }
+
+.search-bar { display: flex; gap: 12px; margin-bottom: 24px; }
+.search-input { flex: 1; padding: 10px 14px; background: var(--panel); border: 1px solid var(--border-mid); border-radius: var(--radius-sm); color: var(--text); font-size: 13px; outline: none; }
+.search-input:focus { border-color: var(--accent); }
+
+.table-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+.table-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; transition: all .16s ease; display: flex; flex-direction: column; gap: 12px; }
+.table-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 6px 24px rgba(0,0,0,.3); }
+
+.card-head { display: flex; align-items: center; justify-content: space-between; }
+.card-name { font-family: 'Space Grotesk', sans-serif; font-size: 16px; font-weight: 700; color: var(--text); }
+.card-domain { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--accent); background: var(--accent-dim); padding: 3px 8px; border-radius: 12px; }
+
+.card-meta { font-size: 12px; color: var(--text-dim); line-height: 1.5; }
+.card-cols { display: flex; flex-wrap: wrap; gap: 4px; }
+.col-badge { font-family: 'JetBrains Mono', monospace; font-size: 11px; background: var(--panel-alt); border: 1px solid var(--border); padding: 2px 7px; border-radius: 4px; color: var(--muted); }
+
+.card-foot { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border); padding-top: 10px; margin-top: auto; }
+.prio-badge { font-family: 'JetBrains Mono', monospace; font-size: 10px; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; }
+.prio-high { background: rgba(251,191,36,.15); color: var(--amber); border: 1px solid var(--amber); }
+.prio-med { background: var(--panel-alt); color: var(--text-dim); border: 1px solid var(--border-mid); }
+
+.btn-edit { background: var(--panel-alt); border: 1px solid var(--border-mid); border-radius: 6px; padding: 4px 10px; font-size: 11.5px; font-family: 'JetBrains Mono', monospace; color: var(--accent); cursor: pointer; }
+.btn-edit:hover { background: var(--accent-dim); border-color: var(--accent); }
+
+/* Modal */
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.7); backdrop-filter: blur(4px); z-index: 500; display: none; align-items: center; justify-content: center; }
+.modal-overlay.open { display: flex; }
+.modal-card { width: 100%; max-width: 500px; background: var(--sidebar-bg); border: 1px solid var(--border-mid); border-radius: var(--radius); padding: 24px; }
+.modal-title { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; margin-bottom: 16px; }
+.form-group { margin-bottom: 14px; }
+.form-label { font-size: 11.5px; font-weight: 600; color: var(--muted); margin-bottom: 4px; display: block; }
+.form-input, .form-select { width: 100%; padding: 8px 12px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: 13px; outline: none; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-row">
+      <div class="brand-icon">⚡</div>
+      <div class="brand-name">AI Database Assistant</div>
+    </div>
+    <div class="brand-sub">schema explorer</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section">Workspace</div>
+    <a href="/" class="nav-link"><span class="nav-icon">💬</span> AI Chat Query</a>
+    <a href="/tables" class="nav-link active"><span class="nav-icon">📊</span> Schema Explorer</a>
+    <a href="/dictionary" class="nav-link"><span class="nav-icon">📖</span> Business Dictionary</a>
+    <a href="/pending-dictionary" class="nav-link"><span class="nav-icon">⏳</span> Pending Tokens</a>
+
+    <div class="nav-section">System & Intelligence</div>
+    <a href="/crawler-dashboard" class="nav-link"><span class="nav-icon">🕸️</span> Knowledge Dashboard</a>
+    <a href="/schema-changes" class="nav-link"><span class="nav-icon">🔄</span> Schema Diff Log</a>
+    <a href="/debug" class="nav-link"><span class="nav-icon">🔍</span> Prompt Debugger</a>
+  </nav>
+  <div class="sidebar-footer">Live Schema & Priority</div>
+</aside>
+
+<main class="main">
+  <div class="page-header">
+    <h1 class="page-title">Schema Explorer & Annotations</h1>
+    <p class="page-subtitle">Inspect database tables, column structures, domain groupings, and set priority hints for the AI reasoning engine.</p>
+  </div>
+
+  <div class="search-bar">
+    <input class="search-input" id="tableSearch" placeholder="Search tables or columns..." oninput="filterTables(this.value)">
+  </div>
+
+  <div class="table-grid" id="tableGrid"></div>
+</main>
+
+<!-- EDIT ANNOTATION MODAL -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal-card">
+    <div class="modal-title" id="editTableName">Edit Table Annotation</div>
+
+    <div class="form-group">
+      <label class="form-label">Business Meaning / Description</label>
+      <input class="form-input" id="editMeaning" placeholder="e.g. Stores company employee records and salary details">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Aliases (comma-separated)</label>
+      <input class="form-input" id="editAliases" placeholder="staff, workers, team members">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Priority Level</label>
+      <select class="form-select" id="editPriority">
+        <option value="Critical">Critical</option>
+        <option value="High">High</option>
+        <option value="Medium">Medium</option>
+        <option value="Low">Low</option>
+      </select>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-edit" style="color:var(--muted);" onclick="closeEditModal()">Cancel</button>
+      <button class="btn-edit" onclick="saveAnnotation()">Save Annotation</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let tablesData = [];
+let activeTable = '';
+
+async function loadTables() {
+  const r = await fetch('/api/tables');
+  const d = await r.json();
+  tablesData = d.tables || [];
+  renderTables(tablesData);
+}
+
+function renderTables(list) {
+  const grid = document.getElementById('tableGrid');
+  if (!list.length) {
+    grid.innerHTML = '<div style="grid-column:1/-1;color:var(--muted);font-family:\'JetBrains Mono\',monospace;">No matching tables found.</div>';
+    return;
+  }
+  grid.innerHTML = list.map(t => `
+    <div class="table-card">
+      <div class="card-head">
+        <div class="card-name">${t.name}</div>
+        <div class="card-domain">${t.domain || 'Uncategorized'}</div>
+      </div>
+      <div class="card-meta">
+        ${t.meaning ? `<div>${t.meaning}</div>` : '<div style="color:var(--muted);font-style:italic;">No description provided</div>'}
+        ${t.aliases && t.aliases.length ? `<div style="font-size:11px;color:var(--accent);margin-top:4px;">Aliases: ${t.aliases.join(', ')}</div>` : ''}
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px;font-family:'JetBrains Mono',monospace;">Columns (${t.columns.length}):</div>
+        <div class="card-cols">
+          ${t.columns.map(c=>`<span class="col-badge">${c}</span>`).join('')}
+        </div>
+      </div>
+      <div class="card-foot">
+        <span class="prio-badge ${t.priority==='Critical'||t.priority==='High'?'prio-high':'prio-med'}">${t.priority || 'Medium'}</span>
+        <button class="btn-edit" onclick="openEditModal('${t.name}')">Annotate</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function filterTables(q) {
+  const term = q.toLowerCase();
+  const filtered = tablesData.filter(t =>
+    t.name.toLowerCase().includes(term) ||
+    (t.domain && t.domain.toLowerCase().includes(term)) ||
+    t.columns.some(c => c.toLowerCase().includes(term))
+  );
+  renderTables(filtered);
+}
+
+function openEditModal(tname) {
+  activeTable = tname;
+  const table = tablesData.find(t => t.name === tname);
+  if (!table) return;
+  document.getElementById('editTableName').textContent = `Annotate table '${tname}'`;
+  document.getElementById('editMeaning').value = table.meaning || '';
+  document.getElementById('editAliases').value = (table.aliases || []).join(', ');
+  document.getElementById('editPriority').value = table.priority || 'Medium';
+  document.getElementById('editModal').classList.add('open');
+}
+
+function closeEditModal() {
+  document.getElementById('editModal').classList.remove('open');
+}
+
+async function saveAnnotation() {
+  const meaning = document.getElementById('editMeaning').value.trim();
+  const aliases = document.getElementById('editAliases').value.trim();
+  const priority = document.getElementById('editPriority').value;
+
+  await fetch(`/api/tables/${encodeURIComponent(activeTable)}/annotation`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({meaning, aliases, priority})
+  });
+  closeEditModal();
+  loadTables();
+}
+
+loadTables();
+</script>
+</body>
+</html>

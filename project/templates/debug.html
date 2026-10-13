@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prompt & System Debugger · AI Database Assistant</title>
+<meta name="description" content="Inspect exact system prompts sent to the local LLM and view live backend engine logs.">
+<style>
+:root {
+  --bg: #0b0d14; --sidebar-bg: #10131e; --panel: #151926; --panel-alt: #1a1f30;
+  --border: #22293d; --border-mid: #2c354f; --text: #e9edfa; --text-dim: #a0a8c2; --muted: #646e8c;
+  --accent: #5eead4; --accent-glow: rgba(94,234,212,0.16); --accent-dim: #1b3e39;
+  --purple: #a78bfa; --amber: #fbbf24; --error: #f87171; --error-bg: #2b1818;
+  --radius: 12px; --radius-sm: 8px; --sidebar-w: 260px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; display: flex; min-height: 100vh; }
+
+.sidebar { width: var(--sidebar-w); min-width: var(--sidebar-w); background: var(--sidebar-bg); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; overflow-y: auto; }
+.sidebar-brand { padding: 20px 18px 14px; border-bottom: 1px solid var(--border); }
+.brand-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.brand-icon { width: 34px; height: 34px; background: linear-gradient(135deg,#5eead4 0%,#3b82f6 100%); border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; box-shadow: 0 0 16px rgba(94,234,212,.25); }
+.brand-name { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 15px; letter-spacing: -.02em; }
+.brand-sub { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--accent); background: var(--accent-dim); padding: 3px 10px; border-radius: 20px; display: inline-block; }
+
+.sidebar-nav { padding: 14px 10px; flex: 1; }
+.nav-section { font-size: 9.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); padding: 0 8px; margin: 14px 0 5px; }
+.nav-section:first-child { margin-top: 0; }
+.nav-link { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: var(--radius-sm); color: var(--text-dim); text-decoration: none; font-size: 13px; font-weight: 500; transition: all .14s; }
+.nav-link:hover { background: var(--panel); color: var(--text); }
+.nav-link.active { background: var(--panel-alt); color: var(--accent); font-weight: 600; }
+.nav-icon { font-size: 14px; width: 18px; text-align: center; }
+
+.sidebar-footer { padding: 12px 18px; border-top: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--muted); }
+
+.main { margin-left: var(--sidebar-w); flex: 1; padding: 36px 40px 60px; max-width: 1100px; }
+.page-header { margin-bottom: 24px; }
+.page-title { font-family: 'Space Grotesk', sans-serif; font-size: 26px; font-weight: 700; letter-spacing: -.03em; margin-bottom: 6px; }
+.page-subtitle { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted); max-width: 680px; line-height: 1.6; }
+
+section.panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 20px; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 18px; border-bottom: 1px solid var(--border); background: var(--panel-alt); }
+.panel-label { font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 600; text-transform: uppercase; color: var(--accent); letter-spacing: .05em; }
+.btn-sm { border: 1px solid var(--border-mid); background: var(--panel); color: var(--text-dim); font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 4px 10px; border-radius: 4px; cursor: pointer; }
+.btn-sm:hover { border-color: var(--accent); color: var(--accent); }
+
+#promptBox, #logsBox { font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.6; color: var(--text-dim); padding: 16px; margin: 0; max-height: 380px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; }
+</style>
+</head>
+<body>
+
+{% include '_app_shell.html' %}
+
+<main class="main">
+  <div class="page-header">
+    <h1 class="page-title">Prompt Debugger & Logs</h1>
+    <p class="page-subtitle">Inspect the exact system prompt sent to the local LLM for the latest natural language query, and view real-time engine logs.</p>
+  </div>
+
+  <section class="panel">
+    <div class="panel-head">
+      <span class="panel-label">Last Sent LLM Prompt</span>
+      <button class="btn-sm" onclick="fetchPrompt()">Refresh Prompt</button>
+    </div>
+    <pre id="promptBox">Loading prompt...</pre>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <span class="panel-label">Engine Logs</span>
+      <button class="btn-sm" onclick="fetchLogs()">Refresh Logs</button>
+    </div>
+    <pre id="logsBox">Loading logs...</pre>
+  </section>
+</main>
+
+<script>
+async function fetchPrompt() {
+  const r = await fetch('/api/debug/prompt');
+  const d = await r.json();
+  const box = document.getElementById('promptBox');
+  if (!r.ok) { box.textContent = d.error || 'Prompt diagnostics are unavailable.'; return; }
+  if (d.prompt) {
+    const perf = d.performance || {};
+    const knowledge = (d.defined_knowledge_used || []).map(item =>
+      `${item.table}: context=${item.table_context ? 'yes' : 'no'}; abbreviations=${(item.abbreviations || []).map(term => term.token).join(', ') || 'none'}`
+    ).join('\n') || 'none';
+    box.textContent = `[Question]: ${d.question || 'N/A'}\n[Timestamp]: ${d.timestamp || 'N/A'}\n[Selected tables]: ${(d.selected_tables || []).join(', ') || 'none'}\n[Defined knowledge used]:\n${knowledge}\n[Prompt chars]: base=${perf.base_prompt_chars ?? 'N/A'}, schema=${perf.schema_chars ?? 'N/A'}, knowledge=${perf.knowledge_chars ?? 'N/A'}, final=${perf.final_prompt_chars ?? 'N/A'}\n[Prompt build]: ${perf.prompt_construction_ms ?? 'N/A'} ms\n\n${d.prompt}`;
+  } else {
+    box.textContent = 'No queries executed in current session yet.';
+  }
+}
+
+async function fetchLogs() {
+  const r = await fetch('/api/logs');
+  const d = await r.json();
+  const box = document.getElementById('logsBox');
+  if (!r.ok) { box.textContent = d.error || 'Log diagnostics are unavailable.'; return; }
+  box.textContent = (d.lines || []).join('\n') || 'Log file empty or not created yet.';
+}
+
+fetchPrompt();
+fetchLogs();
+</script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+.git
+.gitignore
+.venv
+__pycache__
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache
+*.tmp
+.tmp_*
+logs/*.log
+wheelhouse/
+models/
+llama-b10186-bin-win-cpu-x64/
+project/.tmp_*
+project/logs/*.log
+project/knowledge.sync-backup

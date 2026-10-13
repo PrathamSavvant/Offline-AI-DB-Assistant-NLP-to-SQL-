@@ -1,0 +1,1479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Database Assistant · Conversational SQL & Intelligence</title>
+<meta name="description" content="Production-ready AI Database Assistant — conversational NL-to-SQL powered by LangGraph, llama.cpp, and SQLite/MySQL Knowledge Cache.">
+<script src="{{ url_for('static', filename='scripts/marked-offline.js') }}"></script>
+<style>
+:root {
+  --bg:          #0b0d14;
+  --sidebar-bg:  #10131e;
+  --panel:       #151926;
+  --panel-alt:   #1a1f30;
+  --border:      #22293d;
+  --border-mid:  #2c354f;
+  --text:        #e9edfa;
+  --text-dim:    #a0a8c2;
+  --muted:       #646e8c;
+  --accent:      #5eead4;
+  --accent-glow: rgba(94,234,212,.16);
+  --accent-dim:  #1b3e39;
+  --purple:      #a78bfa;
+  --purple-dim:  #2c2254;
+  --amber:       #fbbf24;
+  --error:       #f87171;
+  --error-bg:    #2b1818;
+  --green:       #4ade80;
+  --user-bubble: #1c2238;
+  --ai-bubble:   #151926;
+  --radius:      8px;
+  --radius-sm:   6px;
+  --sidebar-w:   248px;
+  --ease:        ease;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── SCROLLBAR ─────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 99px; }
+
+/* ── SIDEBAR ───────────────────────────────── */
+.sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.sidebar-brand {
+  padding: 20px 18px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.brand-icon {
+  width: 34px; height: 34px;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px;
+  flex-shrink: 0;
+  box-shadow: none;
+}
+.brand-name {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: -.02em;
+}
+.brand-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  color: var(--accent);
+  background: var(--accent-dim);
+  padding: 3px 10px;
+  border-radius: 20px;
+  display: inline-block;
+}
+
+/* Model selector */
+.model-selector-wrap {
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.model-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.model-selector-btn {
+  width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: border-color .15s;
+  position: relative;
+}
+.model-selector-btn:hover { border-color: var(--accent); }
+.model-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  flex-shrink: 0;
+  box-shadow: 0 0 6px var(--green);
+}
+.model-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.model-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0; right: 0;
+  background: var(--panel-alt);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-sm);
+  z-index: 200;
+  overflow: hidden;
+  display: none;
+  box-shadow: 0 8px 32px rgba(0,0,0,.5);
+}
+.model-dropdown.open { display: block; }
+.model-option {
+  padding: 9px 12px;
+  font-size: 12.5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background .1s;
+  color: var(--text-dim);
+}
+.model-option:hover { background: var(--panel); color: var(--text); }
+.model-option.active { color: var(--accent); font-weight: 600; }
+.model-option .mdot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+.model-option.active .mdot { background: var(--green); }
+
+/* Status indicator */
+.sidebar-status {
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.pulse-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+  animation: none;
+}
+.pulse-dot.offline { background: var(--error); animation: none; }
+
+/* Nav */
+.sidebar-nav { padding: 14px 10px; flex: 1; overflow-y: auto; }
+.nav-section {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 8px;
+  margin: 14px 0 5px;
+}
+.nav-section:first-child { margin-top: 0; }
+.nav-link {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background .14s, color .14s;
+}
+.nav-link:hover { background: var(--panel); color: var(--text); }
+.nav-link.active { background: var(--accent-dim); color: var(--accent); font-weight: 600; }
+.nav-icon { font-size: 14px; width: 18px; text-align: center; }
+
+/* Connection & Knowledge Button */
+.conn-btn-wrap {
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+}
+.btn-primary-ghost {
+  width: 100%;
+  padding: 9px 12px;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  transition: all .14s;
+}
+.btn-primary-ghost:hover { background: var(--accent); color: #08201d; box-shadow: 0 0 12px var(--accent-glow); }
+
+.sidebar-footer {
+  padding: 12px 18px;
+  border-top: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* ── MAIN CHAT AREA ────────────────────────── */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Header */
+.main-header {
+  height: 64px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--sidebar-bg);
+  flex-shrink: 0;
+}
+.header-title-group h1 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+}
+.header-title-group p {
+  font-size: 11.5px;
+  color: var(--muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.badge-db {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--accent);
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+/* Thread */
+.chat-thread {
+  flex: 1;
+  overflow-y: auto;
+  padding: 30px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.thread-inner {
+  width: 100%;
+  max-width: 860px;
+  padding: 0 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* Welcome screen */
+.welcome-screen {
+  text-align: center;
+  padding: 32px 20px 20px;
+  max-width: 640px;
+  margin: 0 auto;
+}
+.welcome-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--accent);
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  padding: 4px 12px;
+  border-radius: 20px;
+  margin-bottom: 18px;
+}
+.welcome-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -.03em;
+  margin-bottom: 12px;
+  color: var(--text);
+}
+.welcome-sub {
+  font-size: 14px;
+  color: var(--text-dim);
+  line-height: 1.6;
+  margin-bottom: 32px;
+}
+
+/* Prompt grid */
+.prompt-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  text-align: left;
+}
+.prompt-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  cursor: pointer;
+  transition: border-color .14s, background .14s;
+}
+.prompt-card:hover {
+  border-color: var(--accent);
+  background: var(--panel-alt);
+  box-shadow: none;
+}
+.prompt-card-icon { font-size: 20px; margin-bottom: 8px; }
+.prompt-card-title { font-size: 13.5px; font-weight: 600; margin-bottom: 4px; color: var(--text); }
+.prompt-card-desc { font-size: 11.5px; color: var(--muted); line-height: 1.4; }
+
+/* Messages */
+.msg-row {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.msg-row.user { flex-direction: row-reverse; }
+.avatar {
+  width: 32px; height: 32px;
+  border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+.avatar.user { background: #2b3350; }
+.avatar.ai   { background: var(--accent-dim); border: 1px solid var(--accent); }
+
+.bubble-wrap {
+  max-width: 82%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.msg-row.user .bubble-wrap { align-items: flex-end; }
+
+.bubble {
+  padding: 14px 18px;
+  border-radius: var(--radius);
+  font-size: 14px;
+  line-height: 1.65;
+}
+.bubble.user {
+  background: var(--user-bubble);
+  border: 1px solid var(--border-mid);
+  color: var(--text);
+  border-top-right-radius: 4px;
+}
+.bubble.ai {
+  background: var(--ai-bubble);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-top-left-radius: 4px;
+}
+
+/* Typography inside AI response */
+.bubble.ai p { margin-bottom: 10px; }
+.bubble.ai p:last-child { margin-bottom: 0; }
+.bubble.ai h1, .bubble.ai h2, .bubble.ai h3 {
+  font-family: 'Space Grotesk', sans-serif;
+  margin: 14px 0 8px;
+  color: var(--accent);
+}
+.bubble.ai ul, .bubble.ai ol { margin: 8px 0 8px 20px; }
+.bubble.ai li { margin-bottom: 4px; }
+.bubble.ai code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  background: rgba(255,255,255,.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* Code block & SQL toggle */
+.sql-toggle-wrap {
+  width: 100%;
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-sm);
+  background: #0c0e16;
+  overflow: hidden;
+}
+.sql-toggle-btn {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--panel);
+  border: none;
+  color: var(--text-dim);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: background .14s;
+}
+.sql-toggle-btn:hover { background: var(--panel-alt); color: var(--accent); }
+.sql-block { display: none; }
+.sql-block.open { display: block; border-top: 1px solid var(--border); }
+.sql-block-head {
+  padding: 8px 14px;
+  background: rgba(0,0,0,.3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+}
+.sql-block-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  color: var(--accent);
+  letter-spacing: .05em;
+}
+.sql-actions { display: flex; gap: 6px; }
+.btn-action-sm {
+  padding: 3px 9px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  background: var(--panel-alt);
+  border: 1px solid var(--border-mid);
+  color: var(--text-dim);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all .12s;
+}
+.btn-action-sm:hover { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+.sql-code {
+  padding: 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #7dd3fc;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+/* Smart Data Table Results */
+.result-table-wrap {
+  width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-top: 8px;
+}
+.result-table-header {
+  padding: 10px 16px;
+  background: var(--panel-alt);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.result-table-label {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+.result-table-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+}
+.result-search {
+  width: calc(100% - 24px);
+  margin: 10px 12px 6px;
+  padding: 7px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 12px;
+  outline: none;
+}
+.result-search:focus { border-color: var(--accent); }
+.result-scroll {
+  overflow-x: auto;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.result-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  text-align: left;
+}
+.result-table th {
+  position: sticky; top: 0;
+  background: #141724;
+  padding: 9px 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.result-table td {
+  padding: 8px 14px;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+  color: var(--text);
+  white-space: nowrap;
+}
+.result-table tr:hover td { background: rgba(255,255,255,.02); }
+
+/* KPI Card for single numeric result */
+.kpi-card {
+  background: var(--panel);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: none;
+}
+.kpi-value {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.kpi-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--muted);
+  letter-spacing: .05em;
+}
+
+/* Follow-up chips */
+.followup-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+.followup-chip {
+  background: var(--panel);
+  border: 1px solid var(--border-mid);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 12px;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all .14s;
+}
+.followup-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.msg-meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+  display: flex;
+  gap: 10px;
+}
+
+/* Typing animation */
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+.typing-dots { display: flex; gap: 4px; }
+.typing-dots span {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: typing 1.4s infinite ease-in-out;
+}
+.typing-dots span:nth-child(2) { animation-delay: .2s; }
+.typing-dots span:nth-child(3) { animation-delay: .4s; }
+@keyframes typing { 0%, 100% { opacity: .2; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-4px); } }
+
+/* ── INPUT BAR ─────────────────────────────── */
+.input-area {
+  padding: 16px 24px 24px;
+  background: var(--bg);
+  display: flex;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.input-container {
+  width: 100%;
+  max-width: 860px;
+  background: var(--panel);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius);
+  padding: 8px 12px 8px 16px;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  transition: border-color .15s, box-shadow .15s;
+}
+.input-container:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+.chat-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: none;
+  max-height: 140px;
+  outline: none;
+  padding: 4px 0;
+}
+.chat-input::placeholder { color: var(--muted); }
+.send-btn {
+  width: 36px; height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  border: none;
+  color: #08201d;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .14s;
+  flex-shrink: 0;
+}
+.send-btn:hover:not(:disabled) {
+  background: #7cf3df;
+  box-shadow: none;
+}
+.send-btn:disabled { background: var(--border-mid); color: var(--muted); cursor: not-allowed; }
+
+/* ── MODAL ─────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,.7);
+  backdrop-filter: blur(4px);
+  z-index: 500;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal-card {
+  width: 100%;
+  max-width: 580px;
+  background: var(--sidebar-bg);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius);
+  box-shadow: 0 20px 50px rgba(0,0,0,.6);
+  overflow: hidden;
+}
+.modal-head {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.modal-title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 16px; }
+.modal-close { background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer; }
+.modal-close:hover { color: var(--text); }
+
+.modal-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.modal-tab {
+  flex: 1;
+  padding: 12px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.modal-tab.active { color: var(--accent); border-color: var(--accent); background: var(--sidebar-bg); }
+
+.modal-body { padding: 24px; }
+.form-group { margin-bottom: 16px; }
+.form-label { font-size: 12px; font-weight: 600; color: var(--text-dim); margin-bottom: 6px; display: block; }
+.form-input {
+  width: 100%;
+  padding: 9px 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  outline: none;
+}
+.form-input:focus { border-color: var(--accent); }
+
+.form-grid-2 { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; }
+
+/* Progress steps */
+.progress-list { display: flex; flex-direction: column; gap: 12px; }
+.progress-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+.step-icon { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; }
+.step-icon.pending { background: var(--border-mid); color: var(--muted); }
+.step-icon.active { background: var(--amber); color: #000; animation: spin 1s infinite linear; }
+.step-icon.done { background: var(--green); color: #000; }
+@keyframes spin { 100% { transform: rotate(360deg); } }
+.step-label { flex: 1; font-weight: 500; }
+.step-status { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); }
+
+.modal-foot {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  background: var(--panel);
+}
+.btn-sec {
+  padding: 8px 16px;
+  background: var(--panel-alt);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  font-weight: 500;
+  cursor: pointer;
+}
+.btn-primary {
+  padding: 8px 18px;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: #08201d;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-primary:hover { box-shadow: 0 0 14px var(--accent-glow); }
+</style>
+</head>
+<body class="app-chat">
+
+<!-- SIDEBAR -->
+{% include '_app_shell.html' %}
+
+<!-- MAIN CHAT -->
+<main class="main">
+  <header class="main-header">
+    <div class="header-title-group">
+      <h1>Database Intelligence Assistant</h1>
+      <p id="headerSub">Connected & Ready</p>
+    </div>
+    <div class="header-actions">
+      <span class="badge-db" id="headerDbBadge">mysql</span>
+      <button class="btn-action-sm" onclick="startNewChat()">+ New Session</button>
+    </div>
+  </header>
+
+  <!-- Thread -->
+  <div class="chat-thread" id="chatThread">
+    <div class="thread-inner" id="threadInner">
+
+      <!-- Welcome Screen -->
+      <div class="welcome-screen" id="welcomeScreen">
+        <div class="welcome-badge">✦ Natural Language to SQL</div>
+        <h2 class="welcome-title">Ask your database anything</h2>
+        <p class="welcome-sub">Turn your questions into clear answers using your database and approved business knowledge. Your data stays in your local environment.</p>
+
+        <div class="prompt-grid">
+          <div class="prompt-card" onclick="useSamplePrompt('Show all tables in the database')">
+            <div class="prompt-card-icon">🗂️</div>
+            <div class="prompt-card-title">Show All Tables</div>
+            <div class="prompt-card-desc">See the tables available in your connected database</div>
+          </div>
+
+          <div class="prompt-card" onclick="location.href='/schema-map'">
+            <div class="prompt-card-icon">🔗</div>
+            <div class="prompt-card-title">Explore Schema Map</div>
+            <div class="prompt-card-desc">Inspect foreign key connections for any table</div>
+          </div>
+
+          <div class="prompt-card" onclick="useSamplePrompt('Show schema')">
+            <div class="prompt-card-icon">⚡</div>
+            <div class="prompt-card-title">Inspect Your Schema</div>
+            <div class="prompt-card-desc">Review the available tables and columns</div>
+          </div>
+
+          <div class="prompt-card" onclick="location.href='/defined-knowledge'">
+            <div class="prompt-card-icon">📖</div>
+            <div class="prompt-card-title">Defined Knowledge</div>
+            <div class="prompt-card-desc">Manage table definitions and business abbreviations</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Input -->
+  <div class="input-area">
+    <div class="input-container">
+      <textarea class="chat-input" id="chatInput" rows="1" placeholder="Ask a question about your database (e.g. 'top 5 employees by salary')..." onkeydown="handleKeyDown(event)"></textarea>
+      <button class="send-btn" id="sendBtn" onclick="submitQuery()">➔</button>
+    </div>
+  </div>
+</main>
+
+<!-- CONNECTION & KNOWLEDGE MODAL -->
+<div class="modal-overlay" id="connModal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div class="modal-title">Database Connection & Knowledge Sync</div>
+      <button class="modal-close" onclick="closeConnModal()">×</button>
+    </div>
+
+    <div class="modal-tabs">
+      <div class="modal-tab active" id="tabBtnConn" onclick="switchModalTab('conn')">Database Connection</div>
+      <div class="modal-tab" id="tabBtnSync" onclick="switchModalTab('sync')">Knowledge Generation</div>
+    </div>
+
+    <!-- Tab 1: Connection Form -->
+    <div class="modal-body" id="modalTabConn">
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label class="form-label">Host</label>
+          <input class="form-input" id="cfgHost" value="localhost">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Port</label>
+          <input class="form-input" id="cfgPort" value="3306">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">User</label>
+        <input class="form-input" id="cfgUser" value="root">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input class="form-input" type="password" id="cfgPassword" placeholder="(empty or password)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Database Name</label>
+        <input class="form-input" id="cfgDatabase" value="companydb">
+      </div>
+      <div id="connMsg" style="font-size:12px;font-family:'JetBrains Mono',monospace;margin-top:8px;"></div>
+    </div>
+
+    <!-- Tab 2: Knowledge Progress -->
+    <div class="modal-body" style="display:none;" id="modalTabSync">
+      <div class="progress-list">
+        <div class="progress-step">
+          <div class="step-icon done" id="stIcon1">✓</div>
+          <div class="step-label">1. Database Connection</div>
+          <div class="step-status" id="stText1">Connected</div>
+        </div>
+        <div class="progress-step">
+          <div class="step-icon done" id="stIcon2">✓</div>
+          <div class="step-label">2. Schema Inspection & Fingerprint</div>
+          <div class="step-status" id="stText2">Indexed</div>
+        </div>
+        <div class="progress-step">
+          <div class="step-icon done" id="stIcon3">✓</div>
+          <div class="step-label">3. Relationship Graph & FKs</div>
+          <div class="step-status" id="stText3">Complete</div>
+        </div>
+        <div class="progress-step">
+          <div class="step-icon done" id="stIcon4">✓</div>
+          <div class="step-label">4. Business Dictionary & Annotations</div>
+          <div class="step-status" id="stText4">Loaded</div>
+        </div>
+        <div class="progress-step">
+          <div class="step-icon done" id="stIcon5">✓</div>
+          <div class="step-label">5. Semantic Embeddings & Search</div>
+          <div class="step-status" id="stText5">Active</div>
+        </div>
+      </div>
+      <div id="syncLog" style="margin-top:16px;padding:10px;background:var(--panel);border-radius:var(--radius-sm);font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--accent);">
+        Knowledge base up to date.
+      </div>
+    </div>
+
+    <div class="modal-foot">
+      <button class="btn-sec" onclick="testConnection()">Test Connection</button>
+      <button class="btn-primary" onclick="saveConnectionAndSync()">Connect & Rebuild Knowledge</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── STATE & CONSTANTS ──────────────────────────────────────────────────
+const CHAT_STATE_KEY = 'ai_database_assistant.active_chat.v1';
+const MAX_PERSISTED_MESSAGES = 40;
+function newThreadId() { return 'session-' + Math.random().toString(36).slice(2, 9); }
+function loadChatState() {
+  try { const saved = JSON.parse(sessionStorage.getItem(CHAT_STATE_KEY) || '{}'); return saved && typeof saved === 'object' ? saved : {}; }
+  catch (_) { return {}; }
+}
+let persistedChat = loadChatState();
+let THREAD_ID = persistedChat.thread_id || newThreadId();
+let activeModel = persistedChat.active_model || '';
+let chatEntries = Array.isArray(persistedChat.messages) ? persistedChat.messages : [];
+let isBusy = false;
+let msgCounter = 0;
+
+function persistChat() {
+  try {
+    sessionStorage.setItem(CHAT_STATE_KEY, JSON.stringify({
+      thread_id: THREAD_ID, active_model: activeModel, database: persistedChat.database || '',
+      messages: chatEntries.slice(-MAX_PERSISTED_MESSAGES), saved_at: new Date().toISOString(),
+    }));
+  } catch (_) {
+    // Storage failure must not interrupt an active query or create a new thread.
+  }
+}
+
+// Elements
+const chatThread = document.getElementById('chatThread');
+const threadInner = document.getElementById('threadInner');
+const welcomeScreen = document.getElementById('welcomeScreen');
+const chatInput = document.getElementById('chatInput');
+const sendBtn = document.getElementById('sendBtn');
+const modelName = document.getElementById('modelName');
+const modelDropdown = document.getElementById('modelDropdown');
+const connModal = document.getElementById('connModal');
+
+// Auto-expand textarea
+chatInput.addEventListener('input', () => {
+  chatInput.style.height = 'auto';
+  chatInput.style.height = Math.min(chatInput.scrollHeight, 140) + 'px';
+});
+
+function handleKeyDown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    submitQuery();
+  }
+}
+
+function startNewChat() {
+  THREAD_ID = newThreadId();
+  chatEntries = [];
+  threadInner.innerHTML = '';
+  threadInner.appendChild(welcomeScreen);
+  welcomeScreen.style.display = 'block';
+  persistChat();
+  chatInput.focus();
+}
+
+function useSamplePrompt(text) {
+  chatInput.value = text;
+  submitQuery();
+}
+
+// ── MODEL DROPDOWN ─────────────────────────────────────────────────────
+function toggleModelDropdown() {
+  modelDropdown.classList.toggle('open');
+}
+
+async function loadModels() {
+  try {
+    const r = await fetch('/api/llm/models');
+    const d = await r.json();
+    activeModel = d.active || '';
+    const models = d.models || [];
+    modelName.textContent = activeModel.split(':')[0] || 'Local AI';
+    persistChat();
+
+    if (!models.length) {
+      modelDropdown.innerHTML = '<div class="model-option" style="color:var(--muted);">No models found</div>';
+      return;
+    }
+    modelDropdown.innerHTML = models.map(m => `
+      <div class="model-option ${m.name === activeModel ? 'active' : ''}" onclick="selectModel('${m.name}')">
+        <span class="mdot"></span>
+        <span style="flex:1;">${m.label} <span style="font-size:10px;color:var(--muted);">${m.name}</span></span>
+        ${m.name === activeModel ? '<span style="color:var(--green);">✓</span>' : ''}
+      </div>
+    `).join('');
+  } catch(_) {
+    modelName.textContent = activeModel ? activeModel.split(':')[0] : 'Local AI';
+  }
+}
+
+async function selectModel(name) {
+  try {
+    await fetch('/api/llm/model', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({model: name})
+    });
+    activeModel = name;
+    modelName.textContent = name.split(':')[0];
+    persistChat();
+    loadModels();
+  } catch(_) {}
+  modelDropdown.classList.remove('open');
+}
+
+// ── HEALTH & STATUS ────────────────────────────────────────────────────
+async function checkHealth() {
+  try {
+    const r = await fetch('/api/health');
+    const d = await r.json();
+    document.getElementById('dbBadge').textContent = d.database || 'mysql';
+    document.getElementById('headerDbBadge').textContent = d.database || 'mysql';
+    const readiness = d.knowledge_readiness || {};
+    document.getElementById('statusText').textContent = readiness.schema_ready === false
+      ? 'Schema needs attention' : `${d.tables_loaded} tables · ${d.llm_model}`;
+    document.getElementById('statusText').title = (readiness.issues || []).join('; ');
+    document.getElementById('headerSub').textContent = `Connected to "${d.database}" · ${d.tables_loaded} tables cached · ${readiness.tables_with_approved_meaning ?? 0} with approved meaning`;
+    persistedChat.database = d.database || '';
+    if (!activeModel) {
+      activeModel = d.llm_model || '';
+      modelName.textContent = activeModel.split(':')[0] || 'Local AI';
+    }
+    persistChat();
+  } catch(e) {
+    document.getElementById('statusText').textContent = 'Engine unreachable';
+    document.getElementById('statusDot').classList.add('offline');
+  }
+}
+
+// ── CONNECTION MODAL & KNOWLEDGE SYNC ──────────────────────────────────
+function openConnModal() { connModal.classList.add('open'); }
+function closeConnModal() { connModal.classList.remove('open'); }
+
+function switchModalTab(tab) {
+  document.getElementById('tabBtnConn').classList.toggle('active', tab === 'conn');
+  document.getElementById('tabBtnSync').classList.toggle('active', tab === 'sync');
+  document.getElementById('modalTabConn').style.display = tab === 'conn' ? 'block' : 'none';
+  document.getElementById('modalTabSync').style.display = tab === 'sync' ? 'block' : 'none';
+}
+
+async function testConnection() {
+  const msg = document.getElementById('connMsg');
+  msg.style.color = 'var(--muted)';
+  msg.textContent = 'Testing connection...';
+  try {
+    const r = await fetch('/api/connection/test', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        host: document.getElementById('cfgHost').value.trim(),
+        port: document.getElementById('cfgPort').value.trim(),
+        user: document.getElementById('cfgUser').value.trim(),
+        password: document.getElementById('cfgPassword').value,
+        database: document.getElementById('cfgDatabase').value.trim()
+      })
+    });
+    const d = await r.json();
+    if (r.ok) {
+      msg.style.color = 'var(--green)';
+      msg.textContent = '✓ ' + d.message;
+    } else {
+      msg.style.color = 'var(--error)';
+      msg.textContent = '✖ Error: ' + (d.error || 'Connection failed');
+    }
+  } catch(err) {
+    msg.style.color = 'var(--error)';
+    msg.textContent = '✖ Network error: ' + err.message;
+  }
+}
+
+async function saveConnectionAndSync() {
+  switchModalTab('sync');
+  const log = document.getElementById('syncLog');
+  log.textContent = 'Connecting and rebuilding knowledge...';
+  try {
+    const r = await fetch('/api/connection/connect', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        host: document.getElementById('cfgHost').value.trim(),
+        port: document.getElementById('cfgPort').value.trim(),
+        user: document.getElementById('cfgUser').value.trim(),
+        password: document.getElementById('cfgPassword').value,
+        database: document.getElementById('cfgDatabase').value.trim()
+      })
+    });
+    const d = await r.json();
+    if (r.ok) {
+      log.style.color = 'var(--green)';
+      log.textContent = `✓ Successfully synchronized knowledge for database '${d.database}'.`;
+      checkHealth();
+    } else {
+      log.style.color = 'var(--error)';
+      log.textContent = '✖ Knowledge sync error: ' + (d.error || 'Sync failed');
+    }
+  } catch(err) {
+    log.style.color = 'var(--error)';
+    log.textContent = '✖ Network error: ' + err.message;
+  }
+}
+
+// ── SMART QUERY RESULTS & EXPLANATION ─────────────────────────────────
+function renderSmartResult(data) {
+  const rows = data.rows || [];
+  const cols = data.columns || [];
+  const cnt  = data.row_count || rows.length;
+
+  if (!rows.length) return '';
+
+  // KPI card for single value
+  if (cols.length === 1 && rows.length === 1) {
+    const val = rows[0][cols[0]];
+    if (typeof val === 'number' || (typeof val === 'string' && !isNaN(val))) {
+      return `<div class="kpi-card">
+        <div class="kpi-value">${Number(val).toLocaleString()}</div>
+        <div class="kpi-label">${cols[0].replace(/_/g,' ')}</div>
+      </div>`;
+    }
+  }
+
+  const needsSearch = cnt > 5;
+  const uid = 'tbl-' + Math.random().toString(36).slice(2,8);
+  const displayRows = rows.slice(0, 200);
+
+  return `<div class="result-table-wrap">
+    <div class="result-table-header">
+      <span class="result-table-label">Query Results (${cnt.toLocaleString()} rows)</span>
+      <span class="result-table-count">Displaying ${displayRows.length} rows</span>
+    </div>
+    ${needsSearch ? `<input class="result-search" placeholder="Filter results in table..." oninput="filterTable('${uid}',this.value)">` : ''}
+    <div class="result-scroll">
+      <table class="result-table" id="${uid}">
+        <thead><tr>${cols.map(c=>`<th>${escHtml(c)}</th>`).join('')}</tr></thead>
+        <tbody>
+          ${displayRows.map(r=>`<tr>${cols.map(c=>`<td>${r[c]===null||r[c]===undefined?'—':escHtml(formatValue(r[c]))}</td>`).join('')}</tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function formatValue(v) {
+  if (typeof v === 'number') return v.toLocaleString();
+  return String(v);
+}
+
+function filterTable(uid, query) {
+  const tbl = document.getElementById(uid);
+  if (!tbl) return;
+  const q = query.toLowerCase();
+  tbl.querySelectorAll('tbody tr').forEach(tr => {
+    tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
+function renderSqlBlock(sql) {
+  if (!sql) return '';
+  const uid = 'sql-' + Math.random().toString(36).slice(2,8);
+  return `<div class="sql-toggle-wrap">
+    <button class="sql-toggle-btn" onclick="toggleSql('${uid}')">
+      <span id="sql-arrow-${uid}">▼</span> Generated SQL Query
+    </button>
+    <div class="sql-block open" id="${uid}">
+      <div class="sql-block-head">
+        <span class="sql-block-label">SQL</span>
+        <div class="sql-actions">
+          <button class="btn-action-sm" onclick="explainSql('${uid}')">Explain SQL</button>
+          <button class="btn-action-sm" onclick="executeSql('${uid}')">Execute SQL</button>
+          <button class="btn-action-sm" onclick="copySql('${uid}')">Copy SQL</button>
+        </div>
+      </div>
+      <div class="sql-code" id="sql-code-${uid}">${escHtml(sql)}</div>
+    </div>
+  </div>`;
+}
+
+function toggleSql(uid) {
+  const block = document.getElementById(uid);
+  const arrow = document.getElementById('sql-arrow-' + uid);
+  if (!block) return;
+  const open = block.classList.toggle('open');
+  arrow.textContent = open ? '▼' : '▶';
+}
+
+function copySql(uid) {
+  const el = document.getElementById('sql-code-' + uid);
+  if (el) navigator.clipboard.writeText(el.textContent);
+}
+
+async function explainSql(uid) {
+  const code = document.getElementById('sql-code-' + uid)?.textContent || '';
+  if (!code) return;
+  chatInput.value = "explain this sql: " + code;
+  submitQuery();
+}
+
+async function executeSql(uid) {
+  const code = document.getElementById('sql-code-' + uid)?.textContent || '';
+  if (!code) return;
+  try {
+    const r = await fetch('/api/execute', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({sql: code})
+    });
+    const data = await r.json();
+    if (r.ok && data.rows) {
+      addAiMessage({final_response: `### Executed Query Results\n\nFetched **${data.row_count} rows** successfully.`, rows: data.rows, columns: data.columns, row_count: data.row_count}, 0);
+    } else {
+      addErrorMessage(data.error || 'Execution failed.');
+    }
+  } catch(err) {
+    addErrorMessage('Execution error: ' + err.message);
+  }
+}
+
+// ── CHAT SUBMISSION ────────────────────────────────────────────────────
+function scrollToBottom() {
+  chatThread.scrollTo({ top: chatThread.scrollHeight, behavior: 'smooth' });
+}
+
+function addUserMessage(text, persist = true) {
+  welcomeScreen.style.display = 'none';
+  const id = ++msgCounter;
+  const row = document.createElement('div');
+  row.className = 'msg-row user';
+  row.id = `msg-${id}`;
+  row.innerHTML = `
+    <div class="avatar user">👤</div>
+    <div class="bubble-wrap">
+      <div class="bubble user">${escHtml(text)}</div>
+    </div>`;
+  threadInner.appendChild(row);
+  if (persist) {
+    chatEntries.push({type: 'user', text});
+    persistChat();
+  }
+  scrollToBottom();
+  return id;
+}
+
+function addTypingRow() {
+  const id = ++msgCounter;
+  const row = document.createElement('div');
+  row.className = 'msg-row ai';
+  row.id = `typing-${id}`;
+  row.innerHTML = `
+    <div class="avatar ai">🤖</div>
+    <div class="bubble-wrap">
+      <div class="bubble ai">
+        <div class="typing-indicator">
+          <div class="typing-dots"><span></span><span></span><span></span></div>
+          <span style="font-size:12px;color:var(--muted);font-family:'JetBrains Mono',monospace;">reasoning & querying database...</span>
+        </div>
+      </div>
+    </div>`;
+  threadInner.appendChild(row);
+  scrollToBottom();
+  return id;
+}
+
+function removeTypingRow(id) {
+  const el = document.getElementById(`typing-${id}`);
+  if (el) el.remove();
+}
+
+function addAiMessage(data, elapsed, persist = true) {
+  const id = ++msgCounter;
+  const row = document.createElement('div');
+  row.className = 'msg-row ai';
+  row.id = `msg-${id}`;
+
+  const answer = data.final_response || '';
+  const sql = extractSql(answer);
+  const followups = data.suggested_followups || [];
+  const smartResult = renderSmartResult(data);
+  const sqlHtml = renderSqlBlock(sql);
+
+  let cleanAnswer = sql ? answer.replace(/```sql[\s\S]*?```/gi, '').replace(/```[\s\S]*?```/gi, '').trim() : answer;
+
+  const timingHtml = elapsed !== undefined
+    ? `<span>Answered in ${elapsed < 1000 ? elapsed + 'ms' : (elapsed/1000).toFixed(2) + 's'}</span>`
+    : '';
+
+  row.innerHTML = `
+    <div class="avatar ai">🤖</div>
+    <div class="bubble-wrap">
+      <div class="bubble ai" id="bubble-${id}">${marked.parse(cleanAnswer)}</div>
+      ${smartResult ? `<div>${smartResult}</div>` : ''}
+      ${sqlHtml}
+      ${followups.length ? `<div class="followup-chips">
+        ${followups.map(f=>`<button class="followup-chip" onclick="useSamplePrompt('${escHtml(f)}')">${escHtml(f)}</button>`).join('')}
+      </div>` : ''}
+      <div class="msg-meta">${timingHtml}</div>
+    </div>`;
+
+  threadInner.appendChild(row);
+  if (persist) {
+    chatEntries.push({type: 'assistant', data, elapsed});
+    persistChat();
+  }
+  scrollToBottom();
+  return id;
+}
+
+function addErrorMessage(msg, persist = true) {
+  const id = ++msgCounter;
+  const row = document.createElement('div');
+  row.className = 'msg-row ai';
+  row.id = `msg-${id}`;
+  row.innerHTML = `
+    <div class="avatar ai" style="background:var(--error-bg);border-color:var(--error);">⚠️</div>
+    <div class="bubble-wrap">
+      <div class="bubble ai" style="border-color:var(--error);background:var(--error-bg);">
+        <strong style="color:var(--error);">Error:</strong> ${escHtml(msg)}
+      </div>
+    </div>`;
+  threadInner.appendChild(row);
+  if (persist) {
+    chatEntries.push({type: 'error', message: msg});
+    persistChat();
+  }
+  scrollToBottom();
+}
+
+function restoreChat() {
+  if (!chatEntries.length) return;
+  welcomeScreen.style.display = 'none';
+  chatEntries.forEach(entry => {
+    if (entry.type === 'user') addUserMessage(entry.text, false);
+    else if (entry.type === 'assistant') addAiMessage(entry.data || {}, entry.elapsed, false);
+    else if (entry.type === 'error') addErrorMessage(entry.message || 'Unknown error', false);
+  });
+  requestAnimationFrame(() => { chatThread.scrollTop = chatThread.scrollHeight; });
+}
+
+async function submitQuery() {
+  const q = chatInput.value.trim();
+  if (!q || isBusy) return;
+
+  isBusy = true;
+  sendBtn.disabled = true;
+  chatInput.value = '';
+  chatInput.style.height = 'auto';
+
+  addUserMessage(q);
+  const typingId = addTypingRow();
+  const t0 = Date.now();
+
+  try {
+    const resp = await fetch('/api/agent/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        question: q,
+        thread_id: THREAD_ID,
+        model: activeModel
+      })
+    });
+
+    const elapsed = Date.now() - t0;
+    removeTypingRow(typingId);
+
+    if (!resp.ok) {
+      const d = await resp.json();
+      addErrorMessage(d.error || `Server error (${resp.status})`);
+    } else {
+      const d = await resp.json();
+      if (d.error) {
+        addErrorMessage(d.error);
+      } else {
+        addAiMessage(d, elapsed);
+      }
+    }
+  } catch(err) {
+    removeTypingRow(typingId);
+    addErrorMessage('Network error: ' + err.message);
+  }
+
+  isBusy = false;
+  sendBtn.disabled = false;
+  chatInput.focus();
+}
+
+function extractSql(text) {
+  if (!text) return '';
+  const m = text.match(/```sql([\s\S]*?)```/i);
+  if (m) return m[1].trim();
+  const m2 = text.match(/```([\s\S]*?)```/);
+  if (m2 && /^\s*(SELECT|WITH)\b/i.test(m2[1])) return m2[1].trim();
+  return '';
+}
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+
+// Initialize
+checkHealth();
+loadModels();
+restoreChat();
+chatInput.focus();
+</script>
+</body>
+</html>

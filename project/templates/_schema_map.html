@@ -1,0 +1,21 @@
+<link rel="stylesheet" href="{{ url_for('static', filename='styles/schema-map.css') }}">
+<section id="schemaMap" class="schema-map" aria-label="Database schema map">
+  <div class="map-heading"><div><span class="map-eyebrow">DATABASE EXPLORER</span><h2 id="mapTitle">Schema map</h2></div><span id="mapCounts" class="map-muted"></span></div>
+  <div class="map-toolbar">
+    <label class="map-search"><span class="sr-only">Search tables, columns or abbreviations</span><input id="mapSearch" type="search" placeholder="Find a table, column or abbreviation…" autocomplete="off"></label>
+    <label><span class="sr-only">Filter by domain</span><select id="mapDomain"><option value="">All domains</option></select></label>
+    <label class="map-check"><input id="mapNeighbors" type="checkbox"> Connected tables only</label>
+    <button type="button" id="mapRefresh">Refresh</button>
+  </div>
+  <div class="map-workspace">
+    <div class="map-stage" id="mapStage">
+      <svg id="mapCanvas" role="group" aria-label="Interactive table relationship map. Select a table to inspect its connections." tabindex="0"><defs><marker id="mapArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#628da0"/></marker></defs><g id="mapViewport"><g id="mapEdges"></g><g id="mapNodes"></g></g></svg>
+      <div id="mapMessage" class="map-message" role="status">Loading schema…</div>
+      <div class="map-controls" role="group" aria-label="Map controls"><button type="button" id="mapZoomOut" aria-label="Zoom out">−</button><span id="mapZoom">100%</span><button type="button" id="mapZoomIn" aria-label="Zoom in">+</button><button type="button" id="mapFit">Fit all</button><button type="button" id="mapReset">Reset</button></div>
+      <div class="map-hint">Drag to pan · Scroll to zoom · Drag tables to arrange</div>
+    </div>
+    <div class="map-inspector" id="mapInspector" aria-label="Table details"><div class="map-inspector-empty"><span class="map-orbit">◎</span><h3>Explore your database</h3><p>Select a table to see its knowledge, columns and connections.</p><p>Search narrows the map. Enable “Connected tables only” after selecting a table to inspect its neighborhood.</p></div></div>
+  </div>
+  <div class="map-footer"><span><i class="map-line"></i> Foreign key <i class="map-line semantic"></i> Approved business relationship</span><span id="mapVisible" role="status"></span></div>
+</section>
+<script src="{{ url_for('static', filename='scripts/schema-map.js') }}" defer></script>

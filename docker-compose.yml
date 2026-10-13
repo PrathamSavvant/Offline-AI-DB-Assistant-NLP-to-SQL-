@@ -1,0 +1,64 @@
+version: "3.8"
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: db_assistant_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password_here
+      MYSQL_DATABASE: employees
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./project/setup_companydb.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_password_here"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: db_assistant_backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      - ENVIRONMENT=production
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=root_password_here
+      - DB_NAME=employees
+      - DB_POOL_SIZE=8
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=5000
+      - WAITRESS_THREADS=8
+      - LLM_ENDPOINT=http://host.docker.internal:8080
+      - LLM_MODEL=local-model
+      - ENABLE_BACKGROUND_SYNC=true
+      - SYNC_INTERVAL_MINUTES=15
+      - CORS_ORIGINS=*
+      - LOG_LEVEL=INFO
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./project/knowledge:/app/knowledge
+      - ./project/logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  mysql_data:

@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Pending Knowledge — AI Database Assistant</title>
+  <meta name="description" content="Review AI-detected knowledge suggestions for each table before accepting them into Defined Knowledge.">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0b0d14;
+      --surface:   #111520;
+      --surface2:  #161b2a;
+      --border:    #1e2538;
+      --border-hi: #2e3a52;
+      --text:      #e4e8f4;
+      --muted:     #8892a8;
+      --accent:    #5eead4;
+      --accent-dim:#1b3e39;
+      --warn:      #fbbf24;
+      --warn-dim:  #3c3018;
+      --font:      'Inter', sans-serif;
+      --mono:      'JetBrains Mono', monospace;
+      --radius:    12px;
+      --radius-sm: 8px;
+    }
+
+    html, body { height: 100%; }
+    body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; line-height: 1.6; display: flex; }
+
+    aside {
+      position: fixed; top: 0; left: 0; bottom: 0; width: 228px;
+      background: var(--surface); border-right: 1px solid var(--border);
+      padding: 24px 16px; display: flex; flex-direction: column; gap: 2px; z-index: 100;
+    }
+    .brand { font-size: 15px; font-weight: 700; color: var(--accent); padding: 0 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+    .nav-section { font-size: 10px; font-weight: 600; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; padding: 12px 8px 4px; }
+    .nav-link { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: var(--radius-sm); color: var(--muted); text-decoration: none; font-size: 13.5px; font-weight: 500; transition: background 120ms, color 120ms; }
+    .nav-link:hover { background: var(--surface2); color: var(--text); }
+    .nav-link.active { background: var(--warn-dim); color: var(--warn); }
+    .nav-icon { font-size: 15px; flex-shrink: 0; }
+
+    main { margin-left: 228px; flex: 1; padding: 40px 48px; max-width: calc(100vw - 228px); }
+
+    .page-header { margin-bottom: 28px; }
+    .page-header h1 { font-size: 22px; font-weight: 700; letter-spacing: -.4px; }
+    .page-header p { color: var(--muted); margin-top: 4px; font-size: 13.5px; }
+
+    .summary-bar { display: flex; gap: 20px; margin-bottom: 24px; flex-wrap: wrap; }
+    .summary-pill { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 14px; font-size: 12.5px; color: var(--muted); }
+    .summary-pill strong { color: var(--text); }
+    .search-row { display:flex; gap:8px; margin: -6px 0 20px; max-width: 620px; }
+    .search-row input { flex:1; background:var(--surface); color:var(--text); border:1px solid var(--border-hi); border-radius:var(--radius-sm); padding:10px 12px; font:inherit; }
+    .search-row button { background:var(--surface2); color:var(--text); border:1px solid var(--border-hi); border-radius:var(--radius-sm); padding:0 13px; cursor:pointer; }
+    .search-row button[type="submit"] { background:var(--accent-dim); color:var(--accent); border-color:var(--accent); font-weight:600; }
+    .search-match { color:var(--accent); font-size:11.5px; margin-top:-7px; }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); gap: 14px; }
+
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 18px 20px;
+      text-decoration: none; color: inherit;
+      display: flex; flex-direction: column; gap: 12px;
+      transition: border-color 150ms, transform 150ms, box-shadow 150ms;
+    }
+    .card:hover { border-color: var(--border-hi); transform: translateY(-2px); box-shadow: 0 8px 28px rgba(0,0,0,.35); }
+    .card-name { font-family: var(--mono); font-size: 14.5px; font-weight: 500; color: var(--text); }
+    .badge { display: inline-flex; align-items: center; gap: 5px; border-radius: 20px; padding: 3px 10px; font-size: 11.5px; font-weight: 600; width: fit-content; }
+    .badge-pending { background: var(--warn-dim); color: var(--warn); }
+
+    .card-stats { display: flex; flex-direction: column; gap: 5px; }
+    .stat-row { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: var(--muted); }
+    .stat-val { font-weight: 600; color: var(--text); }
+    .stat-val.missing { color: var(--warn); }
+    .stat-val.has { color: var(--accent); }
+
+    .card-footer { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 4px; margin-top: 2px; transition: color 150ms; }
+    .card:hover .card-footer { color: var(--warn); }
+
+    .empty { grid-column: 1/-1; padding: 48px; text-align: center; color: var(--muted); font-size: 14px; }
+    .empty span { display: block; font-size: 32px; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+
+{% include '_app_shell.html' %}
+
+<main>
+  <div class="page-header">
+    <h1>Pending Knowledge</h1>
+    <p>Tables that are missing definitions or have AI-detected abbreviations waiting for review.</p>
+  </div>
+
+  <div class="summary-bar" id="summary" aria-live="polite"></div>
+  <form class="search-row" id="search-form" role="search">
+    <input id="search" type="search" placeholder="Search table, column, definition, synonym, or abbreviation" aria-label="Search pending knowledge">
+    <button type="submit">Search</button>
+    <button id="reset-search" type="button">Reset</button>
+  </form>
+
+  <div class="grid" id="grid">
+    <div class="empty"><span>⏳</span>Loading…</div>
+  </div>
+</main>
+
+<script>
+  let searchTimer;
+  let lastLoad = 0;
+  const searchInput = document.getElementById('search');
+  const grid = document.getElementById('grid');
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, character => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[character]);
+  }
+  async function load() {
+    const requestId = ++lastLoad;
+    const query = searchInput.value.trim();
+    try {
+      const res = await fetch('/api/knowledge/pending?search=' + encodeURIComponent(query));
+      if (!res.ok) throw new Error('Search request failed');
+      const d = await res.json();
+      if (requestId !== lastLoad) return;
+      const rows = d.pending_tables || [];
+
+      document.getElementById('summary').innerHTML = `
+        <div class="summary-pill">${query ? 'Matching tables' : 'Tables needing review'} <strong>${rows.length}</strong></div>
+        <div class="summary-pill">Ordered by <strong>${query ? 'closest matches first' : 'pending tokens (highest first)'}</strong></div>
+      `;
+
+      grid.innerHTML = rows.length
+        ? rows.map(x => {
+          const defMissing = (x.missing || []).includes('definition');
+          const synPending = x.pending_synonym_count || 0;
+          const abbrPending = x.pending_abbreviation_count || 0;
+          const tokenPending = x.unidentified_token_count || 0;
+          const rowCount = x.approx_row_count || 0;
+          return `
+          <a class="card" href="/pending-knowledge/${encodeURIComponent(x.table)}">
+            <div class="card-name">${escapeHtml(x.table)}</div>
+            ${query && x.search_match ? `<div class="search-match">Matched: ${escapeHtml(x.search_match)}</div>` : ''}
+            <span class="badge badge-pending">⏳ Needs Review</span>
+            <div class="card-stats">
+              <div class="stat-row">
+                <span class="stat-label">Definition</span>
+                <span class="stat-val ${defMissing ? 'missing' : 'has'}">${defMissing ? 'Missing' : 'Suggested'}</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">Unidentified tokens</span>
+                <span class="stat-val ${tokenPending > 0 ? 'missing' : ''}">${tokenPending}</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">Rows / relationships</span>
+                <span class="stat-val">${rowCount.toLocaleString()} / ${(x.incoming_relationship_count || 0) + (x.outgoing_relationship_count || 0)}</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">Synonyms</span>
+                <span class="stat-val ${synPending > 0 ? 'missing' : ''}">${synPending} Pending</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">Abbreviations</span>
+                <span class="stat-val ${abbrPending > 0 ? 'missing' : ''}">${abbrPending} Pending</span>
+              </div>
+            </div>
+            <div class="card-footer">Review →</div>
+          </a>`;
+        }).join('')
+        : `<div class="empty"><span>${query ? '⌕' : '✅'}</span>${query ? `No pending tables match “${escapeHtml(query)}”. Try a table or column name.` : 'All tables are fully defined — nothing pending.'}</div>`;
+    } catch (error) {
+      if (requestId !== lastLoad) return;
+      document.getElementById('summary').textContent = '';
+      grid.innerHTML = '<div class="empty">Search could not load. Please try again.</div>';
+    }
+  }
+
+  document.getElementById('search-form').addEventListener('submit', event => {
+    event.preventDefault();
+    clearTimeout(searchTimer);
+    load();
+  });
+  searchInput.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(load, 140);
+  });
+  document.getElementById('reset-search').addEventListener('click', () => {
+    clearTimeout(searchTimer);
+    searchInput.value = '';
+    load();
+  });
+  load();
+</script>
+</body>
+</html>

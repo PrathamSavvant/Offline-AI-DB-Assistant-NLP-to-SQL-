@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Schema Diff Log · AI Database Assistant</title>
+<meta name="description" content="View historical database schema changes, added/removed tables, and column modifications.">
+<style>
+:root {
+  --bg: #0b0d14; --sidebar-bg: #10131e; --panel: #151926; --panel-alt: #1a1f30;
+  --border: #22293d; --border-mid: #2c354f; --text: #e9edfa; --text-dim: #a0a8c2; --muted: #646e8c;
+  --accent: #5eead4; --accent-glow: rgba(94,234,212,0.16); --accent-dim: #1b3e39;
+  --purple: #a78bfa; --amber: #fbbf24; --error: #f87171; --error-bg: #2b1818;
+  --radius: 12px; --radius-sm: 8px; --sidebar-w: 260px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; display: flex; min-height: 100vh; }
+
+.sidebar { width: var(--sidebar-w); min-width: var(--sidebar-w); background: var(--sidebar-bg); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; overflow-y: auto; }
+.sidebar-brand { padding: 20px 18px 14px; border-bottom: 1px solid var(--border); }
+.brand-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.brand-icon { width: 34px; height: 34px; background: linear-gradient(135deg,#5eead4 0%,#3b82f6 100%); border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; box-shadow: 0 0 16px rgba(94,234,212,.25); }
+.brand-name { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 15px; letter-spacing: -.02em; }
+.brand-sub { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--accent); background: var(--accent-dim); padding: 3px 10px; border-radius: 20px; display: inline-block; }
+
+.sidebar-nav { padding: 14px 10px; flex: 1; }
+.nav-section { font-size: 9.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); padding: 0 8px; margin: 14px 0 5px; }
+.nav-section:first-child { margin-top: 0; }
+.nav-link { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: var(--radius-sm); color: var(--text-dim); text-decoration: none; font-size: 13px; font-weight: 500; transition: all .14s; }
+.nav-link:hover { background: var(--panel); color: var(--text); }
+.nav-link.active { background: var(--panel-alt); color: var(--accent); font-weight: 600; }
+.nav-icon { font-size: 14px; width: 18px; text-align: center; }
+
+.sidebar-footer { padding: 12px 18px; border-top: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--muted); }
+
+.main { margin-left: var(--sidebar-w); flex: 1; padding: 36px 40px 60px; max-width: 1100px; }
+.page-header { margin-bottom: 24px; }
+.page-title { font-family: 'Space Grotesk', sans-serif; font-size: 26px; font-weight: 700; letter-spacing: -.03em; margin-bottom: 6px; }
+.page-subtitle { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted); max-width: 680px; line-height: 1.6; }
+
+.diff-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 24px; }
+.diff-title { font-family: 'Space Grotesk', sans-serif; font-size: 16px; font-weight: 700; color: var(--accent); margin-bottom: 14px; }
+.diff-content { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; line-height: 1.6; color: var(--text-dim); }
+</style>
+</head>
+<body>
+
+{% include '_app_shell.html' %}
+
+<main class="main">
+  <div class="page-header">
+    <h1 class="page-title">Schema Change Log & History</h1>
+    <p class="page-subtitle">Track modifications to tables, added/removed columns, and schema fingerprints over time.</p>
+  </div>
+
+  <div class="diff-card">
+    <div class="diff-title">Latest Schema Snapshot & Diff</div>
+    <div class="diff-content" id="latestDiff">Loading diff...</div>
+  </div>
+</main>
+
+<script>
+async function loadChanges() {
+  const r = await fetch('/api/schema-changes');
+  const d = await r.json();
+  const el = document.getElementById('latestDiff');
+  const latest = d.latest || {};
+
+  el.innerHTML = `
+    <div><strong>Added Tables:</strong> ${(latest.added_tables||[]).join(', ')||'None'}</div>
+    <div><strong>Removed Tables:</strong> ${(latest.removed_tables||[]).join(', ')||'None'}</div>
+    <div><strong>Modified Columns:</strong> ${Object.keys(latest.added_columns||{}).length ? JSON.stringify(latest.added_columns) : 'None'}</div>
+  `;
+}
+loadChanges();
+</script>
+</body>
+</html>

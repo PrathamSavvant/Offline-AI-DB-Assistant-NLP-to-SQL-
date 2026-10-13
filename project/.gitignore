@@ -1,0 +1,11 @@
+.env
+__pycache__/
+*.py[cod]
+.pytest_cache/
+logs/*.log
+knowledge/embeddings/*.index
+*.tmp
+.tmp_*
+wheelhouse/
+*.egg-info/
+knowledge.sync-backup

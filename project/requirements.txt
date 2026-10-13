@@ -1,0 +1,12 @@
+mysql-connector-python>=9.0,<10
+python-dotenv>=1.0,<2
+flask>=3.0,<4
+requests>=2.31,<3
+sqlglot>=25.0,<28
+waitress>=3.0,<4
+rapidfuzz>=3.0,<4
+# Optional semantic retrieval dependencies (loaded lazily at runtime).
+sentence-transformers>=3.0,<4
+faiss-cpu>=1.8,<2
+numpy>=1.26,<3
+pytest>=8.0,<9

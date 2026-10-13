@@ -1,0 +1,65 @@
+# Secrets and machine-specific configuration
+.env
+.env.*
+!.env.example
+project/.env
+project/.env.*
+!project/.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+*.egg-info/
+
+# Local runtime and large binary artifacts
+runtime/
+models/
+llama-*-bin-*/
+outputs/
+wheelhouse/
+work/
+
+# Runtime state and diagnostics
+logs/
+project/logs/
+project/.runtime/
+project/scratch/*.log
+project/scratch/
+project/.tmp*/
+project/knowledge.sync-backup/
+project/knowledge.sync-backup
+
+# Database-scoped schema and approved business knowledge
+project/knowledge/*
+!project/knowledge/.gitkeep
+
+# Local/demo SQL data dumps
+project/setup_companydb*.sql
+
+# Historical implementation notes and generated benchmark artifacts
+project/docs/
+project/BACKEND_REFACTOR.md
+project/REFACTOR_CHANGES.md
+project/TABLE_KNOWLEDGE_ARCHITECTURE.md
+
+# Generated files
+*.tmp
+.tmp_*
+*.index
+*.faiss
+*.gguf
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

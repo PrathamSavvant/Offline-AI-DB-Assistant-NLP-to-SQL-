@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Business Dictionary · AI Database Assistant</title>
+<meta name="description" content="Manage domain acronyms, business expansions, and synonyms for natural language SQL translation.">
+<style>
+:root {
+  --bg: #0b0d14; --sidebar-bg: #10131e; --panel: #151926; --panel-alt: #1a1f30;
+  --border: #22293d; --border-mid: #2c354f; --text: #e9edfa; --text-dim: #a0a8c2; --muted: #646e8c;
+  --accent: #5eead4; --accent-glow: rgba(94,234,212,0.16); --accent-dim: #1b3e39;
+  --purple: #a78bfa; --amber: #fbbf24; --error: #f87171; --error-bg: #2b1818;
+  --radius: 12px; --radius-sm: 8px; --sidebar-w: 260px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; display: flex; min-height: 100vh; }
+
+.sidebar { width: var(--sidebar-w); min-width: var(--sidebar-w); background: var(--sidebar-bg); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; overflow-y: auto; }
+.sidebar-brand { padding: 20px 18px 14px; border-bottom: 1px solid var(--border); }
+.brand-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.brand-icon { width: 34px; height: 34px; background: linear-gradient(135deg,#5eead4 0%,#3b82f6 100%); border-radius: 99px; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; box-shadow: 0 0 16px rgba(94,234,212,.25); }
+.brand-name { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 15px; letter-spacing: -.02em; }
+.brand-sub { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--accent); background: var(--accent-dim); padding: 3px 10px; border-radius: 20px; display: inline-block; }
+
+.sidebar-nav { padding: 14px 10px; flex: 1; }
+.nav-section { font-size: 9.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); padding: 0 8px; margin: 14px 0 5px; }
+.nav-section:first-child { margin-top: 0; }
+.nav-link { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: var(--radius-sm); color: var(--text-dim); text-decoration: none; font-size: 13px; font-weight: 500; transition: all .14s; }
+.nav-link:hover { background: var(--panel); color: var(--text); }
+.nav-link.active { background: var(--panel-alt); color: var(--accent); font-weight: 600; }
+.nav-icon { font-size: 14px; width: 18px; text-align: center; }
+
+.sidebar-footer { padding: 12px 18px; border-top: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--muted); }
+
+.main { margin-left: var(--sidebar-w); flex: 1; padding: 36px 40px 60px; max-width: 1100px; }
+.page-header { margin-bottom: 24px; }
+.page-title { font-family: 'Space Grotesk', sans-serif; font-size: 26px; font-weight: 700; letter-spacing: -.03em; margin-bottom: 6px; }
+.page-subtitle { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted); max-width: 680px; line-height: 1.6; }
+
+.add-card { background: var(--panel); border: 1px solid var(--border-mid); border-radius: var(--radius); padding: 20px; margin-bottom: 24px; }
+.card-title { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 600; color: var(--accent); margin-bottom: 14px; }
+.form-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+.form-field { display: flex; flex-direction: column; gap: 5px; }
+.form-label { font-size: 10.5px; font-weight: 600; text-transform: uppercase; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+input[type=text] { padding: 8px 12px; background: var(--panel-alt); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 13px; outline: none; }
+input[type=text]:focus { border-color: var(--accent); }
+
+.btn-accent { background: var(--accent); color: #08201d; border: none; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 13px; padding: 9px 18px; border-radius: var(--radius-sm); cursor: pointer; transition: all .14s; }
+.btn-accent:hover { box-shadow: 0 0 14px var(--accent-glow); }
+.btn-danger { background: var(--error-bg); border: 1px solid var(--error); color: var(--error); font-size: 11.5px; font-family: 'JetBrains Mono', monospace; padding: 4px 10px; border-radius: 4px; cursor: pointer; }
+.btn-danger:hover { background: var(--error); color: #000; }
+.btn-sm { background: var(--panel-alt); border: 1px solid var(--border-mid); color: var(--accent); font-size: 11.5px; font-family: 'JetBrains Mono', monospace; padding: 4px 10px; border-radius: 4px; cursor: pointer; }
+
+.table-panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
+th { padding: 12px 16px; background: var(--panel-alt); border-bottom: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; color: var(--muted); }
+td { padding: 12px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tr:hover td { background: rgba(255,255,255,.02); }
+.abbr-badge { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--accent); }
+.syn-text { color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+.toast-msg { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); margin-top: 10px; min-height: 18px; }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-row">
+      <div class="brand-icon">⚡</div>
+      <div class="brand-name">AI Database Assistant</div>
+    </div>
+    <div class="brand-sub">dictionary</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section">Workspace</div>
+    <a href="/" class="nav-link"><span class="nav-icon">💬</span> AI Chat Query</a>
+    <a href="/tables" class="nav-link"><span class="nav-icon">📊</span> Schema Explorer</a>
+    <a href="/dictionary" class="nav-link active"><span class="nav-icon">📖</span> Business Dictionary</a>
+    <a href="/pending-dictionary" class="nav-link"><span class="nav-icon">⏳</span> Pending Tokens</a>
+
+    <div class="nav-section">System & Intelligence</div>
+    <a href="/crawler-dashboard" class="nav-link"><span class="nav-icon">🕸️</span> Knowledge Dashboard</a>
+    <a href="/schema-changes" class="nav-link"><span class="nav-icon">🔄</span> Schema Diff Log</a>
+    <a href="/debug" class="nav-link"><span class="nav-icon">🔍</span> Prompt Debugger</a>
+  </nav>
+  <div class="sidebar-footer">Instant Term Resolution</div>
+</aside>
+
+<main class="main">
+  <div class="page-header">
+    <h1 class="page-title">Business Dictionary</h1>
+    <p class="page-subtitle">Map business abbreviations and acronyms to their full semantic expansions (e.g. <strong>HR</strong> → Human Resources, <strong>EMP</strong> → Employees).</p>
+  </div>
+
+  <div class="add-card">
+    <div class="card-title">Add Business Dictionary Entry</div>
+    <div class="form-row">
+      <div class="form-field">
+        <span class="form-label">Abbreviation / Token</span>
+        <input type="text" id="abbr" placeholder="HR" style="width:110px;text-transform:uppercase;">
+      </div>
+      <div class="form-field">
+        <span class="form-label">Expansion</span>
+        <input type="text" id="expansion" placeholder="Human Resources" style="width:220px;">
+      </div>
+      <div class="form-field">
+        <span class="form-label">Synonyms (comma-separated)</span>
+        <input type="text" id="synonyms" placeholder="people ops, personnel" style="width:260px;">
+      </div>
+      <div class="form-field">
+        <span class="form-label">Aliases (comma-separated)</span>
+        <input type="text" id="aliases" placeholder="HQ, Main Office" style="width:220px;">
+      </div>
+      <button class="btn-accent" onclick="addEntry()">+ Add Entry</button>
+    </div>
+    <div class="toast-msg" id="toastMsg"></div>
+  </div>
+
+  <div class="table-panel">
+    <div style="padding:12px 16px;border-bottom:1px solid var(--border);"><input id="search" type="text" placeholder="Search token, expansion, synonym, alias" oninput="loadEntries()" style="width:min(420px,100%);"></div>
+    <table>
+      <thead>
+        <tr>
+          <th>Token</th>
+          <th>Expansion</th>
+          <th>Synonyms</th>
+          <th>Add Synonym</th>
+          <th style="width:140px;">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div id="emptyNote" style="padding:20px;text-align:center;color:var(--muted);font-family:'JetBrains Mono',monospace;display:none;">No dictionary entries registered.</div>
+  </div>
+</main>
+
+<script>
+async function loadEntries() {
+  const query = document.getElementById('search')?.value || '';
+  const r = await fetch('/api/dictionary?search=' + encodeURIComponent(query));
+  const d = await r.json();
+  const tbody = document.getElementById('rows');
+  tbody.innerHTML = '';
+  const entries = d.entries || [];
+  document.getElementById('emptyNote').style.display = entries.length ? 'none' : 'block';
+
+  for (const e of entries) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="abbr-badge">${e.abbreviation}</td>
+      <td><input type="text" value="${e.expansion}" data-abbr="${e.abbreviation}" class="edit-exp" style="width:100%;"></td>
+      <td class="syn-text">${(e.synonyms||[]).join(', ') || '—'}</td>
+      <td><input type="text" value="${(e.synonyms||[]).join(', ')}" placeholder="synonyms" data-abbr="${e.abbreviation}" class="add-syn" style="width:140px;"><br><input type="text" value="${(e.aliases||[]).join(', ')}" placeholder="aliases" data-abbr="${e.abbreviation}" class="edit-alias" style="width:140px;margin-top:5px;"></td>
+      <td>
+        <div style="display:flex;gap:6px;">
+          <button class="btn-sm" onclick="saveEntry('${e.abbreviation}')">Save</button>
+          <button class="btn-danger" onclick="deleteEntry('${e.abbreviation}')">Delete</button>
+        </div>
+      </td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+async function addEntry() {
+  const abbreviation = document.getElementById('abbr').value.trim();
+  const expansion = document.getElementById('expansion').value.trim();
+  const synonyms = document.getElementById('synonyms').value.trim();
+  const aliases = document.getElementById('aliases').value.trim();
+  if (!abbreviation || !expansion) { setToast('Abbreviation and expansion are required.'); return; }
+
+  await fetch('/api/dictionary', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({abbreviation, expansion, synonyms, aliases})
+  });
+  document.getElementById('abbr').value = '';
+  document.getElementById('expansion').value = '';
+  document.getElementById('synonyms').value = '';
+  document.getElementById('aliases').value = '';
+  setToast(`✓ Saved '${abbreviation.toUpperCase()}'.`);
+  loadEntries();
+}
+
+async function saveEntry(abbr) {
+  const expansion = document.querySelector(`.edit-exp[data-abbr="${abbr}"]`).value.trim();
+  const synonyms = document.querySelector(`.add-syn[data-abbr="${abbr}"]`).value.trim();
+  const aliases = document.querySelector(`.edit-alias[data-abbr="${abbr}"]`).value.trim();
+  await fetch(`/api/dictionary/${encodeURIComponent(abbr)}`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({expansion, synonyms, aliases})
+  });
+  setToast(`✓ Updated '${abbr}'.`);
+  loadEntries();
+}
+
+async function deleteEntry(abbr) {
+  if (!confirm(`Delete dictionary entry for '${abbr}'?`)) return;
+  await fetch(`/api/dictionary/${encodeURIComponent(abbr)}`, {method: 'DELETE'});
+  setToast(`Deleted '${abbr}'.`);
+  loadEntries();
+}
+
+function setToast(txt) {
+  const m = document.getElementById('toastMsg');
+  m.textContent = txt;
+  setTimeout(() => m.textContent = '', 3000);
+}
+
+loadEntries();
+</script>
+</body>
+</html>
