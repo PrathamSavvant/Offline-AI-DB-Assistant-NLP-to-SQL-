@@ -164,8 +164,8 @@ Sentence Transformers and FAISS are disabled.
 ### 1. Clone and enter the application
 
 ```powershell
-git clone https://github.com/PrathamSavvant/AI-Database-Assistant.git
-cd AI-Database-Assistant\project
+git clone https://github.com/PrathamSavvant/Offline-AI-DB-Assistant-NLP-to-SQL-.git
+cd Offline-AI-DB-Assistant-NLP-to-SQL-\project
 ```
 
 ### 2. Create the Python environment
